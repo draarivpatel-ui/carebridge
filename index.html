@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; worker-src 'self'; connect-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>CareBridge · the care week</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#workspace">Skip to the workbench</a>
+
+<header class="masthead">
+  <div class="mast-inner">
+    <p class="brand">
+      <svg class="mark" viewBox="0 0 44 30" aria-hidden="true" focusable="false">
+        <path d="M4 11h36"/>
+        <path d="M8 11c5 10 23 10 28 0"/>
+        <path d="M14 11v4.6M22 11v6.4M30 11v4.6"/>
+        <path d="M10 25h8M26 25h8" class="water"/>
+      </svg>
+      <span class="wordmark">CareBridge</span>
+    </p>
+    <div class="mast-state">
+      <span class="pill">Synthetic demo</span>
+      <span id="app-status" class="app-status" role="status">Warming up…</span>
+      <label class="keys" for="shortcut-toggle">
+        <input type="checkbox" id="shortcut-toggle">
+        <span>Shortcut keys <kbd>w</kbd><kbd>s</kbd><kbd>m</kbd><kbd>h</kbd></span>
+      </label>
+    </div>
+  </div>
+  <nav class="workbench" aria-label="Workbenches">
+    <div class="nav-group">
+      <button type="button" id="nav-week" aria-current="page">Care week</button>
+      <button type="button" id="nav-symptoms">Check-in</button>
+      <button type="button" id="nav-meds">Medicines</button>
+      <button type="button" id="nav-handoff">Handoff</button>
+    </div>
+  </nav>
+</header>
+
+<main id="workspace" tabindex="-1">
+  <section id="week" class="panel" aria-labelledby="week-title">
+    <div class="panel-head">
+      <h1 id="week-title" tabindex="-1">The care week</h1>
+      <div class="panel-tools">
+        <label class="tool" for="scenario">Scenario
+          <select id="scenario"></select>
+        </label>
+        <button type="button" id="reset-week">Reset week</button>
+      </div>
+    </div>
+    <p id="week-caption" class="panel-caption"></p>
+    <dl class="metrics">
+      <div class="metric" id="coverage"><dt>Coverage</dt><dd>n/a</dd></div>
+      <div class="metric" id="saved"><dt>Back with the primary</dt><dd>n/a</dd></div>
+      <div class="metric" id="fairness" title="0 is an equal workload among active caregivers; higher means more uneven."><dt>Workload Gini</dt><dd>n/a</dd></div>
+    </dl>
+    <div class="week-layout">
+      <div id="week-grid" class="week-grid"></div>
+      <aside class="circle" aria-labelledby="circle-title">
+        <h2 id="circle-title">Care circle</h2>
+        <p class="circle-key"><span class="key-line base"></span>first pass <span class="key-line now"></span>balanced</p>
+        <ul id="circle-list" class="circle-list"></ul>
+      </aside>
+    </div>
+  </section>
+
+  <section id="symptoms" class="panel" hidden aria-labelledby="symptoms-title">
+    <div class="panel-head">
+      <h1 id="symptoms-title" tabindex="-1">The check-in</h1>
+    </div>
+    <p class="notice" role="note">Fictional examples only. Not a medical device. Follow the care team's instructions. For a medical emergency, call 911 in the U.S. or your local emergency number.</p>
+    <div class="split">
+      <form id="symptom-form" class="sheet" novalidate>
+        <fieldset>
+          <legend>Right now</legend>
+          <p class="hint">If any of these is happening, call emergency services; no temperature reading is needed.</p>
+          <div id="signs" class="checks"></div>
+        </fieldset>
+        <fieldset>
+          <legend>The reading</legend>
+          <div class="field-row">
+            <label for="temperature">Temperature</label>
+            <input id="temperature" type="number" step="any" inputmode="decimal" placeholder="blank if none">
+            <label for="unit" class="inline">Unit</label>
+            <select id="unit">
+              <option value="F">°F</option>
+              <option value="C">°C</option>
+            </select>
+            <label class="check inline" for="oral"><input id="oral" type="checkbox" checked> Oral</label>
+          </div>
+          <div class="field-row">
+            <label for="sustained">Held this long, in minutes</label>
+            <input id="sustained" type="number" min="0" max="1440" step="1" value="0">
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Context</legend>
+          <div class="checks">
+            <label class="check" for="chemo"><input id="chemo" type="checkbox" checked> On chemotherapy now</label>
+            <label class="check" for="infection"><input id="infection" type="checkbox"> Signs of infection such as chills, a sore throat, or a wound that looks worse</label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>The last three days</legend>
+          <p class="hint">Severity for each day: 0 none, 1 mild, 2 worse, 3 severe.</p>
+          <div id="trend-days" class="trend"></div>
+        </fieldset>
+        <button type="submit" class="primary">Run the check-in</button>
+      </form>
+      <div class="sheet">
+        <div id="triage-result" class="triage" role="status" aria-live="polite">
+          <p class="quiet">Run the check-in to see where a reading lands; a severe sign means call first.</p>
+        </div>
+        <div class="teach">
+          <h2>What the numbers mean</h2>
+          <dl>
+            <div class="teach-row">
+              <dt>Call on the first reading</dt>
+              <dd>During chemotherapy, a single reading at or above 100.4&nbsp;°F or 38.0&nbsp;°C means call the care team now; do not wait an hour to see whether it holds.</dd>
+            </div>
+            <div class="teach-row">
+              <dt>The formal definitions, for comparison</dt>
+              <dd>Oral readings only: one reading at or above 101.0&nbsp;°F or 38.3&nbsp;°C, or a reading at or above 100.4&nbsp;°F or 38.0&nbsp;°C held for one full hour. The published cutoffs are stated per unit and are not exact conversions of each other.</dd>
+            </div>
+          </dl>
+          <p>Nothing matching a rule is not an all-clear and no result here is a diagnosis; keep watching and call the team if anything changes. This demo never suggests doses.</p>
+          <p class="quiet">References for this exercise include the CDC's Watch Out for Fever guidance and the IDSA clinical guideline on fever and neutropenia.</p>
+        </div>
+        <div class="logbox">
+          <h2>Session log</h2>
+          <ol id="checkin-log" class="log"></ol>
+          <p class="hint">Clears when the scenario changes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="meds" class="panel" hidden aria-labelledby="meds-title">
+    <div class="panel-head">
+      <h1 id="meds-title" tabindex="-1">The medicine day</h1>
+    </div>
+    <div class="split">
+      <div class="sheet">
+        <fieldset>
+          <legend>This week's context</legend>
+          <p class="hint" id="med-scope-note">One fictional day, times only, no dates; adjacent days are not evaluated.</p>
+          <div class="checks">
+            <label class="check" for="ctx-risk-window"><input id="ctx-risk-window" type="checkbox"> Fever risk window</label>
+            <label class="check" for="ctx-low-platelets"><input id="ctx-low-platelets" type="checkbox"> Low platelets</label>
+            <label class="check" for="ctx-bleeding"><input id="ctx-bleeding" type="checkbox"> Bleeding risk</label>
+            <label class="check" for="ctx-anticoagulant"><input id="ctx-anticoagulant" type="checkbox"> On a blood thinner</label>
+          </div>
+          <div class="field-row">
+            <label class="check" for="ctx-temp-toggle"><input id="ctx-temp-toggle" type="checkbox"> Temperature recorded</label>
+            <label for="ctx-temp-time">Time recorded</label>
+            <input id="ctx-temp-time" type="time" disabled>
+          </div>
+        </fieldset>
+        <form id="med-add-form" class="add-form">
+          <label for="med-item">Item</label>
+          <select id="med-item"></select>
+          <label for="med-at">At</label>
+          <input id="med-at" type="time" required>
+          <label for="med-status">Status</label>
+          <select id="med-status">
+            <option value="planned">Planned</option>
+            <option value="logged">Logged</option>
+          </select>
+          <button type="submit" id="med-add">Add to the day</button>
+        </form>
+        <p id="med-cap-note" class="hint" hidden>The demo day holds at most 36 entries.</p>
+      </div>
+      <div class="sheet">
+        <div id="med-timeline" class="timeline">
+          <svg id="med-axis" viewBox="0 0 640 84" role="img" aria-label="Twenty-four hour timeline of the day's entries"></svg>
+        </div>
+        <ol id="med-entries" class="entries"></ol>
+        <h2 class="flags-head">Flags for the care team</h2>
+        <div id="med-flags" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="handoff" class="panel" hidden aria-labelledby="handoff-title">
+    <div class="panel-head">
+      <h1 id="handoff-title" tabindex="-1">The handoff sheet</h1>
+    </div>
+    <p id="imported-note" class="notice" hidden>
+      Viewing a card opened from a shared link; it is read-only and stays put whatever the demo plan does.
+      <button type="button" id="return-demo">Return to the demo</button>
+    </p>
+    <div class="hando-controls">
+      <label class="tool" for="handoff-person">For
+        <select id="handoff-person"></select>
+      </label>
+      <label class="tool" for="handoff-language">Language
+        <select id="handoff-language">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+        </select>
+      </label>
+      <button type="button" id="print-binder">Print the sheet</button>
+    </div>
+    <div id="binder" class="binder"></div>
+    <div class="share">
+      <button type="button" id="seal-card" class="primary">Seal a share link</button>
+      <label class="sr-only" for="handoff-link">Sealed share link</label>
+      <input id="handoff-link" type="text" readonly placeholder="The sealed link appears here">
+      <button type="button" id="copy-link" disabled>Copy</button>
+    </div>
+    <p id="handoff-status" class="hint" role="status"></p>
+    <p class="hint aes">Anyone who opens the full link holds the key. The card is sealed in your browser and never sent to a server, but there is no way to prove who sent it and no way to take it back. Share synthetic demo data only: no real names, records or treatment details.</p>
+    <div class="exports">
+      <button type="button" id="export-calendar">Calendar for this person (.ics)</button>
+      <button type="button" id="export-schedule">Week schedule (CSV)</button>
+      <button type="button" id="export-symptoms">Symptom log (CSV)</button>
+      <button type="button" id="audit-bundle">Audit bundle (JSON)</button>
+    </div>
+  </section>
+</main>
+
+<footer class="colophon">
+  <p>CareBridge uses fictional names, readings and plans. The app does not send this data to a server.</p>
+</footer>
+
+<div id="live-status" class="sr-only" role="status" aria-live="polite"></div>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
