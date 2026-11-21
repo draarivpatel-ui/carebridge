@@ -251,6 +251,10 @@ try {
   await until(() => visible('#scenario'), 'offline week');
   assert.match(await text('#coverage dd'), /^12 of 12 staffed/);
   await noOverflow();
+  await navigate(`${origin}?offline-check=1`);
+  await until(() => visible('#scenario'), 'offline week via a query URL');
+  assert.match(await text('#coverage dd'), /^12 of 12 staffed/);
+  await noOverflow();
 
   const pageErrors = events.filter(e => e.method === 'Runtime.exceptionThrown');
   const consoleErrors = events.filter(e => (e.method === 'Runtime.consoleAPICalled' && e.params.type === 'error') ||

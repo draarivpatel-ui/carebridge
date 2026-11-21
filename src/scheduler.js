@@ -2,6 +2,7 @@ const WEEK = 7 * 1440;
 export const GAP = Object.freeze({
   availability: 'uncovered-no-available-caregiver',
   skill: 'uncovered-missing-skill',
+  dropout: 'uncovered-only-sitting-out-caregiver',
   constraint: 'uncovered-cap-or-rest-limit',
 });
 
@@ -60,11 +61,17 @@ export function planWeek(shifts, caregivers, { primaryId = null, dropped = [] } 
   validate(shifts, caregivers, primaryId, dropped);
   const team = caregivers.filter(c => !dropped.includes(c.id))
     .sort((a, b) => order(a.id, b.id)).map(c => ({ ...c, windows: combine(c.windows) }));
+  const inactive = caregivers.filter(c => dropped.includes(c.id))
+    .map(c => ({ ...c, windows: combine(c.windows) }));
   const jobs = [...shifts].sort((a, b) => a.start - b.start || order(a.id, b.id)).map(shift => {
-    const available = team.flatMap((c, i) =>
-      c.windows.some(([start, end]) => start <= shift.start && end >= shift.end) ? [i] : []);
-    const skilled = available.filter(i => shift.skills.every(skill => team[i].skills.includes(skill)));
-    return { ...shift, available, skilled, length: shift.end - shift.start };
+    const covering = person => person.windows.some(([start, end]) => start <= shift.start && end >= shift.end);
+    const qualified = person => shift.skills.every(skill => person.skills.includes(skill));
+    const available = team.flatMap((c, i) => covering(c) ? [i] : []);
+    const skilled = available.filter(i => qualified(team[i]));
+    const open = inactive.some(covering);
+    const out = inactive.some(person =>
+      covering(person) && qualified(person) && person.cap >= shift.end - shift.start);
+    return { ...shift, available, skilled, open, out, length: shift.end - shift.start };
   });
   const ceiling = Array(jobs.length + 1).fill(0);
   for (let j = jobs.length - 1; j >= 0; j--) {
@@ -83,7 +90,10 @@ export function planWeek(shifts, caregivers, { primaryId = null, dropped = [] } 
       return {
         shiftId: s.id,
         caregiverId,
-        reason: caregiverId !== null ? null : !s.available.length ? GAP.availability : !s.skilled.length ? GAP.skill : GAP.constraint,
+        reason: caregiverId !== null ? null
+          : !s.available.length ? (s.out ? GAP.dropout : s.open ? GAP.skill : GAP.availability)
+          : !s.skilled.length ? (s.out ? GAP.dropout : GAP.skill)
+          : GAP.constraint,
       };
     });
     return {

@@ -80,10 +80,41 @@ for (const preset of PRESETS) {
   }
 }
 
-test('crisis fixture demonstrates all three gap classes', () => {
+test('crisis fixture attributes every gap to its real cause', () => {
   const p = PRESETS[2];
   const { balanced } = planWeek(p.shifts, p.caregivers, p);
-  assert.deepEqual(new Set(balanced.allocation.filter(a => a.reason).map(a => a.reason)), new Set(Object.values(GAP)));
+  const reasons = Object.fromEntries(balanced.allocation.filter(a => a.reason).map(a => [a.shiftId, a.reason]));
+  assert.deepEqual(reasons, {
+    'wed-ride': GAP.constraint,
+    'thu-night': GAP.dropout,
+    'sat-meal': GAP.dropout,
+    'sun-company': GAP.dropout,
+  });
+});
+
+test('each gap class has an honest diagnosis', () => {
+  const people = [
+    carer('a', 30, 0, [], [[0, 1000]]),
+    carer('b', 10080, 0, ['meal'], [[0, 120]]),
+    carer('d', 10080, 0, ['night'], [[0, 4000]]),
+  ];
+  const jobs = [
+    shift('capped', 500, 560),
+    shift('sits-out-window', 2000, 2060),
+    shift('sits-out-skill', 50, 80, ['night']),
+    shift('nobody-skilled', 60, 90, ['drive']),
+    shift('nobody-free', 5000, 5060),
+  ];
+  const reasons = Object.fromEntries(
+    planWeek(jobs, people, { dropped: ['d'] }).balanced.allocation.map(a => [a.shiftId, a.reason]));
+  assert.deepEqual(reasons, {
+    'capped': GAP.constraint,
+    'sits-out-window': GAP.dropout,
+    'sits-out-skill': GAP.dropout,
+    'nobody-skilled': GAP.skill,
+    'nobody-free': GAP.availability,
+  });
+  assert.equal(planWeek(jobs, people).balanced.covered, 3);
 });
 
 test('exact solver covers a restricted job that the primary-first baseline blocks', () => {

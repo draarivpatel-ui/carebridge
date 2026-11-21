@@ -45,26 +45,34 @@ export function worseningTrends(history) {
     last[0][key] < last[1][key] && last[1][key] < last[2][key]);
 }
 
-export function assessCheckIn({
-  emergency = [], reading = null, chemo = false, signsOfInfection = false, history = [],
-} = {}) {
+export function assessCheckIn(context = {}) {
+  if (context === null || typeof context !== 'object' || Array.isArray(context)) {
+    throw new TypeError('Unknown check-in context or emergency symptom.');
+  }
+  const {
+    emergency = [], reading = null, chemo = false, signsOfInfection = false, history = [],
+  } = context;
   if (!Array.isArray(emergency) || [...emergency].some(key => typeof key !== 'string' || !Object.hasOwn(EMERGENCY_SIGNS, key)) ||
       typeof chemo !== 'boolean' || typeof signsOfInfection !== 'boolean') {
     throw new TypeError('Unknown check-in context or emergency symptom.');
   }
-  if (emergency.length) return { level: 'emergency', reasons: [...new Set(emergency)], fever: null };
   let fever = null;
   if (reading != null) {
     try {
       fever = feverDefinition(reading);
     } catch (error) {
-      if (!signsOfInfection) throw error;
+      if (!signsOfInfection && !emergency.length) throw error;
     }
   }
-  if (chemo && (fever?.actionThreshold || signsOfInfection)) return {
-    level: 'urgent-oncology', reasons: [fever?.actionThreshold ? 'chemo-fever' : 'chemo-infection-signs'], fever,
-  };
+  if (emergency.length) return { level: 'emergency', reasons: [...new Set(emergency)], fever };
   const trend = worseningTrends(history);
+  if (chemo && (fever?.actionThreshold || signsOfInfection)) return {
+    level: 'urgent-oncology', reasons: [
+      ...(fever?.actionThreshold ? ['chemo-fever'] : []),
+      ...(signsOfInfection ? ['chemo-infection-signs'] : []),
+      ...trend,
+    ], fever,
+  };
   if (fever?.actionThreshold || signsOfInfection || trend.length) return {
     level: 'same-day', reasons: [
       ...(fever?.actionThreshold ? ['reported-fever'] : []), ...(signsOfInfection ? ['infection-signs'] : []), ...trend,

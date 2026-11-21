@@ -19,6 +19,7 @@ const TITLES = {
 const WHY = {
   [GAP.availability]: 'Nobody is free in this window.',
   [GAP.skill]: 'Whoever is free does not hold the needed skills.',
+  [GAP.dropout]: 'Only someone sitting out this week could cover it.',
   [GAP.constraint]: 'Weekly caps or required rest leave no one able to take it.',
 };
 
@@ -368,6 +369,8 @@ function renderResult(res, reading) {
           : 'is below the first-reading threshold';
     const conversion = reading.unit === 'F' ? ` (about ${celsius.toFixed(4)} °C; compared in °F)` : '';
     box.append(el('p', { class: 'read', text: `A reading of ${reading.value} °${reading.unit}${conversion} ${note}.` }));
+  } else if (reading) {
+    box.append(el('p', { class: 'read', text: 'The entered temperature could not be checked against the thresholds; this result does not use it.' }));
   } else if (res.level === 'emergency') {
     box.append(el('p', { text: 'No temperature was needed for this call.' }));
   }
@@ -776,7 +779,9 @@ async function importHash() {
   renderHandoff();
   handoffStatus(card
     ? 'Shared card opened; it is read-only.'
-    : 'That link could not be opened; it may be invalid or changed.');
+    : !globalThis.crypto?.subtle
+      ? 'Shared links need a secure page; open this app over HTTPS or localhost.'
+      : 'That link could not be opened; it may be invalid or changed.');
   announce(card
     ? 'Shared handoff card opened; it is read-only.'
     : 'That shared link could not be opened.');

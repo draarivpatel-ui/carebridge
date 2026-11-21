@@ -1,7 +1,7 @@
 import { wallToUTC, ZONES } from './clock.js';
 
 const encoder = new TextEncoder();
-const forbiddenText = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u;
+const forbiddenText = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/u;
 const escapeText = value => {
   if (typeof value !== 'string' || forbiddenText.test(value) || !value.isWellFormed()) {
     throw new TypeError('Invalid calendar text.');

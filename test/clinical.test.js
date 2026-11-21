@@ -72,6 +72,31 @@ test('a malformed temperature does not suppress a reported infection sign', () =
     { level: 'same-day', reasons: ['infection-signs'], fever: null });
 });
 
+test('an emergency still records a usable reading but survives an unusable one', () => {
+  const withReading = assessCheckIn({ emergency: ['chest'], reading: r(103, 'F') });
+  assert.equal(withReading.level, 'emergency');
+  assert.equal(withReading.fever?.actionThreshold, true);
+  assert.deepEqual(assessCheckIn({ emergency: ['chest'], reading: r(103, 'K') }),
+    { level: 'emergency', reasons: ['chest'], fever: null });
+});
+
+test('oncology urgency reports every contributing sign', () => {
+  const history = [trend(0, 0, 0), trend(1, 0, 0), trend(2, 0, 0)];
+  assert.deepEqual(
+    assessCheckIn({ chemo: true, signsOfInfection: true, reading: r(38.5, 'C'), history }).reasons,
+    ['chemo-fever', 'chemo-infection-signs', 'hydration']);
+  assert.throws(() => assessCheckIn({ chemo: true, reading: r(38, 'C'), history: [trend(9, 0, 0)] }));
+});
+
+for (const context of ['garbage', 42, true, [], null]) {
+  test(`check-in rejects a non-object context ${JSON.stringify(context)}`, () =>
+    assert.throws(() => assessCheckIn(context), TypeError));
+}
+for (const options of ['garbage', 42, true, [], null]) {
+  test(`medication plan rejects non-object options ${JSON.stringify(options)}`, () =>
+    assert.throws(() => checkMedicationPlan([m('calcium', 0)], options), TypeError));
+}
+
 const m = (item, at, status = 'planned') => ({ item, at, status });
 const flags = (items, context) => checkMedicationPlan(items, context).flags.map(flag => flag.code);
 for (const item of ['acetaminophen', 'ibuprofen', 'naproxen']) {

@@ -24,9 +24,13 @@ export function formatTime(minute) {
   return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 }
 
-export function checkMedicationPlan(entries, {
-  riskWindow = false, lowPlatelets = false, bleedingRisk = false, anticoagulant = false, temperatureAt = null,
-} = {}) {
+export function checkMedicationPlan(entries, options = {}) {
+  if (options === null || typeof options !== 'object' || Array.isArray(options)) {
+    throw new TypeError('Medication context must be an options object.');
+  }
+  const {
+    riskWindow = false, lowPlatelets = false, bleedingRisk = false, anticoagulant = false, temperatureAt = null,
+  } = options;
   if (!Array.isArray(entries) || entries.length > 36 || [...entries].some(e =>
     !e || typeof e.item !== 'string' || !Object.hasOwn(ITEMS, e.item) || !inDay(e.at) || !['planned', 'logged'].includes(e.status)) ||
     (temperatureAt != null && !inDay(temperatureAt)) ||

@@ -1,5 +1,6 @@
 const namespace = `carebridge-shell:${self.registration.scope}:`;
-const cacheName = `${namespace}v1`;
+// Bump the version whenever a cached file changes; install re-fetches them all.
+const cacheName = `${namespace}v2`;
 const home = new URL('./index.html', self.registration.scope).href;
 const shell = [
   'index.html', 'styles.css', 'favicon.svg', 'src/app.js', 'src/binder.js', 'src/shortcuts.js',
@@ -26,9 +27,11 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  const { href } = new URL(event.request.url);
+  const url = new URL(event.request.url);
+  const href = url.origin + url.pathname;
   const navigate = event.request.mode === 'navigate' && (href === self.registration.scope || href === home);
   if (navigate || shell.includes(href)) {
-    event.respondWith((async () => (await (await caches.open(cacheName)).match(navigate ? home : href)) ?? Response.error())());
+    event.respondWith((async () =>
+      (await (await caches.open(cacheName)).match(navigate ? home : href)) ?? fetch(event.request))());
   }
 });

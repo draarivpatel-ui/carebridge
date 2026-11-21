@@ -44,7 +44,9 @@ const dayLabel = (iso, lang) => {
   const fmt = new Intl.DateTimeFormat(lang === 'es' ? 'es' : 'en', {
     timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric',
   });
-  return fmt.format(new Date(`${iso}T00:00:00Z`));
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(iso)) ? new Date(`${iso}T00:00:00Z`) : null;
+  if (!date || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== iso) return 'n/a';
+  return fmt.format(date);
 };
 
 const roleText = (role, lang) => ROLES[role]?.[lang] ?? ROLES[role]?.en ?? role;

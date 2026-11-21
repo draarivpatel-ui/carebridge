@@ -51,6 +51,12 @@ test('calendar escapes injection text, preserves UTF-8 and folds at 75 octets', 
   assert.equal(unfolded.split('\r\n').filter(line => line === 'BEGIN:VEVENT').length, 1);
   assert.ok(validateCalendar(text));
 });
+test('calendar rejects C1 controls and NEL anywhere in text values', () => {
+  for (const bad of ['a\u0080b', 'a\u009fb', 'a\u0085b']) {
+    assert.throws(() => calendar([{ ...event(), title: bad }]), TypeError);
+  }
+  assert.equal(validateCalendar(calendar([event()]).replace('SUMMARY:Ride', 'SUMMARY:Ri\u0085de')), false);
+});
 test('calendar requires at least one component, distinct UIDs and positive durations', () => {
   assert.throws(() => calendar([]));
   assert.equal(validateCalendar(calendar([event()]).replace(/BEGIN:VEVENT[\s\S]*?END:VEVENT\r\n/, '')), false);
