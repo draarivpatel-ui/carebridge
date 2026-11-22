@@ -1,0 +1,11 @@
+CareBridge is a browser workbench for rehearsing a week of shared recovery care. Everything on screen is fictional, nothing leaves the device, and it is not a medical device. On the post-chemo week the primary-first baseline and the balanced solver both staff all twelve shifts. The difference is who carries them. Maya drops from twenty-eight hours to seven, and the workload Gini falls from 0.715 to 0.061.
+
+The understaffed crisis week is harsher. The balanced plan covers seven of eleven shifts where the first pass covers five, and every open shift reports its honest cause. Three can only be covered by someone sitting out, and one stays blocked by weekly caps and required rest. Bringing Ana back previews ten of eleven, and the last gap still says why.
+
+The check-in applies published fever guidance to one reading. During chemotherapy a single reading at or above 100.4 Fahrenheit means call the care team now rather than wait an hour. The formal IDSA definition is shown separately, and the app is plain that the two published cutoffs are not exact conversions of each other. Nothing matching a rule is an all-clear either.
+
+The medicine day flags worked label examples inside one fictional timeline. A mineral planned forty-five minutes from ciprofloxacin lands inside that label's restricted window. Acetaminophen logged before the recorded temperature check earns a fever masking flag. The app surfaces these for the care team and never adjusts, skips, or times a real dose.
+
+The handoff sheet prints one page per caregiver in English or Spanish. Sealing a share link encrypts the card in the browser with a fresh AES-GCM key that rides in the URL fragment and is never sent to a server. The same view exports a calendar file, schedule and symptom CSVs, and an audit bundle carrying a SHA-256 digest.
+
+The workbench runs offline with no accounts and no backend, and three hundred thirty-six tests pass across the solver, the fever rules, and every export. CareBridge lets a family rehearse the week instead of improvising it.
