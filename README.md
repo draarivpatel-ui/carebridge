@@ -2,6 +2,8 @@
 
 CareBridge is a no-backend browser workbench for rehearsing a week of shared oncology or recovery care. It uses fictional data only. It is not a medical device, a diagnosis tool, a treatment plan, or a substitute for a clinician, a pharmacist, or emergency services.
 
+**Live demo:** [https://aariv.me/carebridge/](https://aariv.me/carebridge/)
+
 ## Run it
 
 ```sh
