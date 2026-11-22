@@ -6,6 +6,13 @@ import { sealCard, openCard } from './crypto-card.js';
 import { makeCalendar, makeCSV, createAuditBundle } from './exports.js';
 import { renderBinder } from './binder.js';
 import { shortcutFor } from './shortcuts.js';
+import {
+  checkInteractions, missedDose, refillRunway, handoffCheckpoints, CLASSES,
+} from './interactions.js';
+import {
+  encodeBookmark, decodeBookmark, signJSON, signedJSONText, signedCSV, signedMarkdown, verifySigned,
+} from './handoff-brief.js';
+import { runSelfTests } from './selftest.js';
 
 const $ = id => document.getElementById(id);
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -88,6 +95,7 @@ const state = {
   imported: null,
   checkins: [],
   meds: [],
+  refills: [],
   medCtx: { riskWindow: false, lowPlatelets: false, bleedingRisk: false, anticoagulant: false, temperatureAt: null },
   person: null,
   lang: 'en',
@@ -483,6 +491,8 @@ const FLAG_TEXT = (flag, name) => {
 
 function renderMeds() {
   readMedContext();
+  renderInteractions();
+  renderRefills();
   let result;
   try {
     result = checkMedicationPlan(state.meds, state.medCtx);
@@ -561,6 +571,163 @@ function onAddMed(event) {
   announce(`${ITEMS[item]} added at ${formatTime(h * 60 + m)}.`);
 }
 
+/* ---------------- interactions, spacing and safety ---------------- */
+
+const SEV_LABEL = { high: 'High', moderate: 'Moderate', spacing: 'Spacing' };
+const SEV_RANK = { high: 0, moderate: 1, spacing: 2 };
+
+function renderInteractions() {
+  const box = $('ix-report');
+  box.textContent = '';
+  let report;
+  try {
+    report = checkInteractions(state.meds);
+  } catch {
+    box.append(el('p', { class: 'none', text: 'This day is outside the demo limits.' }));
+    renderDoseAxis([]);
+    return;
+  }
+  if (!report.findings.length) {
+    box.append(el('p', { class: 'none', text: 'No pairwise findings on this day; that is not the same as an all-clear.' }));
+  } else {
+    box.append(el('ul', {}, report.findings.map(f => el('li', { class: `flag ix sev-${f.severity}` },
+      el('span', { class: `sev sev-${f.severity}`, text: SEV_LABEL[f.severity] }),
+      el('span', { class: 'ix-label', text: `${f.label}. ` }),
+      el('span', { class: 'ix-detail', text: f.detail })))));
+  }
+  renderDoseAxis(report.findings);
+}
+
+// The spacing day: one 24-hour lane where spacing collisions draw a band between
+// the two doses and the week's busiest handoff minutes sit above as checkpoints.
+function renderDoseAxis(findings) {
+  const axis = $('dose-axis');
+  axis.textContent = '';
+  const L = 46, R = 600, Y = 66;
+  const x = at => L + (at / 1440) * (R - L);
+  const entries = state.meds.map((e, index) => ({ ...e, index }))
+    .sort((a, b) => a.at - b.at || a.index - b.index);
+  const severityOf = new Map();
+  for (const f of findings) {
+    for (const i of f.indices) {
+      const current = severityOf.get(i);
+      if (!current || SEV_RANK[f.severity] < SEV_RANK[current]) severityOf.set(i, f.severity);
+    }
+  }
+
+  axis.append(svg('line', { x1: L, x2: R, y1: Y, y2: Y, class: 'axis' }));
+  let checkpoints = [];
+  try { checkpoints = handoffCheckpoints(preset().shifts); } catch { checkpoints = []; }
+  for (const cp of checkpoints) {
+    const cx = x(cp.minute);
+    axis.append(svg('line', { x1: cx, x2: cx, y1: 14, y2: Y + 6, class: 'cp' },
+      svg('title', {}, `Handoff checkpoint ${formatTime(cp.minute)} (${cp.count} this week)`)));
+    axis.append(svg('text', { x: Math.min(cx + 4, R - 62), y: 11, class: 'cp-label' },
+      `handoff ${formatTime(cp.minute)}`));
+  }
+  for (const f of findings) {
+    if (f.severity !== 'spacing') continue;
+    const [lo, hi] = f.between;
+    axis.append(svg('rect', {
+      x: x(lo), y: Y - 34, width: Math.max(3, x(hi) - x(lo)), height: 20, rx: 4, class: 'band',
+    }, svg('title', {}, `${f.label}: ${formatTime(lo)} to ${formatTime(hi)}`)));
+  }
+  for (const h of [0, 6, 12, 18, 24]) {
+    const tx = x(h * 60);
+    axis.append(svg('line', { x1: tx, x2: tx, y1: Y, y2: Y + 6, class: 'tick' }));
+    axis.append(svg('text', {
+      x: h === 0 ? tx : tx - 12, y: Y + 20, class: 'tick-label',
+    }, `${pad(h)}:00`));
+  }
+  for (const e of entries) {
+    const ex = x(e.at);
+    const sev = severityOf.get(e.index);
+    if (sev) axis.append(svg('circle', { cx: ex, cy: Y, r: 9.5, class: `halo sev-${sev}` }));
+    axis.append(svg('circle', {
+      cx: ex, cy: Y, r: 6,
+      class: `mk ${e.status}${sev ? ` sev-${sev}` : ''}`,
+    }, svg('title', {}, `${ITEMS[e.item]} at ${formatTime(e.at)} (${e.status})`)));
+  }
+
+  const spacing = findings.filter(f => f.severity === 'spacing').length;
+  const other = findings.length - spacing;
+  const count = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+  $('dose-key').textContent =
+    `${count(entries.length, 'entry', 'entries')} on the day · ${count(spacing, 'spacing band')} · ` +
+    `${count(other, 'other finding')} · ${count(checkpoints.length, 'handoff checkpoint')}`;
+}
+
+function onMissedCheck(event) {
+  event.preventDefault();
+  const box = $('missed-result');
+  box.textContent = '';
+  box.className = 'missed';
+  const values = ['missed-at', 'missed-next', 'missed-now'].map(id => $(id).value);
+  if (values.some(t => !t)) return;
+  const [missed, next, remembered] = values.map(t => {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  });
+  let nextAt = next;
+  let overnight = false;
+  if (nextAt <= missed) { nextAt += 1440; overnight = true; }
+  if (!overnight && remembered < missed) {
+    box.append(
+      el('h3', { text: 'Not missed yet' }),
+      el('p', { text: 'The remembered time is before the scheduled dose, so nothing is late. When the dose comes due, the written plan leads.' }),
+      el('p', { class: 'dosecap', text: 'One dose at a time, never two to catch up' }));
+    announce('Checked: the dose is not missed yet.');
+    return;
+  }
+  const now = remembered < missed ? remembered + 1440 : remembered;
+  const res = missedDose({ missedAt: missed, nextAt, now });
+  box.classList.add(res.action);
+  box.append(
+    el('h3', { text: res.label }),
+    el('p', { text: res.detail }),
+    el('p', { class: 'dosecap', text: `${formatTime(missed)} missed · next at ${formatTime(nextAt % 1440)} · one dose at a time, never two to catch up` }));
+  announce(`Missed-dose check: ${res.action === 'take' ? 'take the missed dose now' : 'skip it'}.`);
+}
+
+const refillDays = days => days >= 9.95 ? `${Math.round(days)}` : days.toFixed(1);
+
+function renderRefills() {
+  const list = $('refill-list');
+  list.textContent = '';
+  for (const [index, r] of state.refills.entries()) {
+    const run = refillRunway(r);
+    list.append(el('li', { class: 'entry' },
+      el('span', { class: 'item', text: ITEMS[r.item] }),
+      el('span', { class: 'run', text: `${r.perDay} a day · ${r.onHand} on hand · about ${refillDays(run.days)} days` }),
+      el('span', { class: `run-tag ${run.status === 'critical' ? 'crit' : run.status}`, text: run.status }),
+      el('button', { type: 'button', class: 'rm', 'data-rrm': index, text: 'Remove' })));
+  }
+  if (!state.refills.length) {
+    list.append(el('li', { class: 'entry' }, el('span', { class: 'quiet', text: 'No refills tracked yet.' })));
+  }
+  const full = state.refills.length >= 12;
+  $('refill-add').disabled = full;
+  $('refill-cap-note').hidden = !full;
+}
+
+function onAddRefill(event) {
+  event.preventDefault();
+  if (state.refills.length >= 12) return;
+  const item = $('refill-item').value;
+  const refill = { item, perDay: Number($('refill-perday').value), onHand: Number($('refill-onhand').value) };
+  try {
+    refillRunway(refill);
+  } catch {
+    announce('That refill is outside the demo limits.');
+    return;
+  }
+  if (!Object.hasOwn(CLASSES, item)) return;
+  state.refills.push(refill);
+  renderRefills();
+  renderReadiness();
+  announce(`${ITEMS[item]} refill added.`);
+}
+
 /* ---------------- the handoff ---------------- */
 
 function currentCard() {
@@ -618,6 +785,7 @@ function renderHandoff() {
   } catch { /* the binder renders its empty state */ }
   $('export-calendar').disabled = !card?.tasks.length;
   renderBinder($('binder'), card, state.lang);
+  renderReadiness();
 }
 
 async function onSeal() {
@@ -757,11 +925,196 @@ async function onAudit() {
   }
 }
 
+/* ---------------- readiness, signed brief and self-tests ---------------- */
+
+function renderReadiness() {
+  const dl = $('readiness');
+  dl.textContent = '';
+  const p = preset();
+  let cells;
+  try {
+    const { balanced } = plan();
+    const open = balanced.allocation.filter(a => !a.caregiverId).length;
+    const flags = checkMedicationPlan(state.meds, state.medCtx).flags.length +
+      checkInteractions(state.meds).findings.length;
+    const critical = state.refills.filter(r => refillRunway(r).status === 'critical').length;
+    cells = [
+      ['Coverage', `${balanced.covered} of ${p.shifts.length} staffed`],
+      ['Open shifts', open ? `${open} still open` : 'none'],
+      ['Flags on the day', `${flags}`],
+      ['Refills under 7 days', `${critical}`],
+    ];
+  } catch {
+    cells = [['Coverage', 'n/a'], ['Open shifts', 'n/a'], ['Flags on the day', 'n/a'], ['Refills under 7 days', 'n/a']];
+  }
+  for (const [term, value] of cells) {
+    dl.append(el('div', { class: 'metric' }, el('dt', { text: term }), el('dd', { text: value })));
+  }
+  let checkpoints = [];
+  try { checkpoints = handoffCheckpoints(p.shifts); } catch { /* stays empty */ }
+  $('handoff-times').textContent = checkpoints.length
+    ? `The plan most often changes hands around ${checkpoints.slice(0, 4).map(c => formatTime(c.minute)).join(', ')}.`
+    : '';
+}
+
+function briefPayload() {
+  const card = currentCard();
+  const p = preset();
+  const { balanced } = plan();
+  return {
+    v: 1, alias: card.alias, zone: card.zone, scenario: p.id,
+    tasks: card.tasks,
+    openShifts: balanced.allocation.filter(a => !a.caregiverId)
+      .map(a => ({ shiftId: a.shiftId, reason: a.reason })),
+    meds: state.meds.map(({ item, at, status }) => ({ item, at, status })),
+    medContext: { ...state.medCtx },
+    medFlags: checkMedicationPlan(state.meds, state.medCtx).flags.map(f => f.code),
+    interactions: checkInteractions(state.meds).findings
+      .map(f => ({ code: f.code, severity: f.severity, items: f.items, gap: f.gap ?? null })),
+    refills: state.refills.map(r => ({ ...r, status: refillRunway(r).status })),
+    notes: card.notes,
+    warning: 'Synthetic demo brief: fictional names, times and notes only. Not medical advice; confirm every clinical detail with the care team.',
+  };
+}
+
+function briefDigest(text) {
+  return verifySigned(text).expected;
+}
+
+function onBriefJSON() {
+  try {
+    const text = signedJSONText(briefPayload());
+    download('carebridge-brief.json', text, 'application/json');
+    handoffStatus(`Signed JSON brief; sha256 ${briefDigest(text).slice(0, 16)}…`);
+  } catch {
+    handoffStatus('The signed brief failed.');
+  }
+}
+
+function onBriefCSV() {
+  try {
+    const pay = briefPayload();
+    const rows = [['section', 'field', 'value', 'extra']];
+    for (const t of pay.tasks) rows.push(['task', t.start, t.end, ROLES[t.role]?.en ?? t.role]);
+    for (const o of pay.openShifts) rows.push(['open', o.shiftId, o.reason ?? '', '']);
+    for (const m of pay.meds) rows.push(['med', ITEMS[m.item], formatTime(m.at), m.status]);
+    for (const f of pay.medFlags) rows.push(['flag', f, '', '']);
+    for (const f of pay.interactions) rows.push(['interaction', f.code, f.severity, f.items.join(' + ')]);
+    for (const r of pay.refills) {
+      const run = refillRunway(r);
+      rows.push(['refill', ITEMS[r.item], `${r.onHand} on hand, ${r.perDay} a day`, `${refillDays(run.days)} days (${run.status})`]);
+    }
+    for (const n of pay.notes) rows.push(['note', n, NOTES[n]?.en ?? n, '']);
+    rows.push(['warning', pay.warning, '', '']);
+    const text = signedCSV(rows);
+    download('carebridge-brief.csv', text, 'text/csv');
+    handoffStatus(`Signed CSV brief; sha256 ${briefDigest(text).slice(0, 16)}…`);
+  } catch {
+    handoffStatus('The signed brief failed.');
+  }
+}
+
+function onBriefMarkdown() {
+  try {
+    const pay = briefPayload();
+    const lines = [
+      '# CareBridge handoff brief', '',
+      `Prepared for ${pay.alias}. All times ${pay.zone}. Synthetic demo data only.`,
+      '', '## Tasks',
+      ...(pay.tasks.length ? pay.tasks.map(t => `- ${t.start} to ${t.end}: ${ROLES[t.role]?.en ?? t.role}`) : ['- none']),
+      '', '## Open shifts',
+      ...(pay.openShifts.length ? pay.openShifts.map(o => `- ${o.shiftId}: ${o.reason ?? 'open'}`) : ['- none']),
+      '', '## Medication day',
+      ...(pay.meds.length ? pay.meds.map(m => `- ${formatTime(m.at)} ${ITEMS[m.item]} (${m.status})`) : ['- none']),
+      '', '### Flags for the care team',
+      ...pay.medFlags.map(f => `- ${f}`),
+      ...pay.interactions.map(f => `- [${f.severity}] ${f.code}: ${f.items.join(' + ')}`),
+      ...(pay.medFlags.length || pay.interactions.length ? [] : ['- none']),
+      '', '## Refills',
+      ...(pay.refills.length ? pay.refills.map(r => {
+        const run = refillRunway(r);
+        return `- ${ITEMS[r.item]}: ${r.onHand} on hand, ${r.perDay} a day, about ${refillDays(run.days)} days (${run.status})`;
+      }) : ['- none']),
+      '', '## Notes',
+      ...pay.notes.map(n => `- ${NOTES[n]?.en ?? n}`),
+      '', pay.warning,
+    ];
+    const text = signedMarkdown(lines.join('\n'));
+    download('carebridge-brief.md', text, 'text/markdown');
+    handoffStatus(`Signed Markdown brief; sha256 ${briefDigest(text).slice(0, 16)}…`);
+  } catch {
+    handoffStatus('The signed brief failed.');
+  }
+}
+
+function onBookmark() {
+  try {
+    const frag = encodeBookmark({
+      v: 1,
+      scenario: preset().id,
+      dropped: [...state.dropped],
+      meds: state.meds.map(({ item, at, status }) => ({ item, at, status })),
+      medCtx: { ...state.medCtx },
+      refills: state.refills.map(({ item, onHand, perDay }) => ({ item, onHand, perDay })),
+      person: state.person,
+      lang: state.lang,
+    });
+    $('bookmark-link').value = `${location.origin}${location.pathname}${frag}`;
+    handoffStatus('Setup bookmark ready; opening it restores this scenario, roster and medicine day.');
+    announce('Setup bookmark written.');
+  } catch {
+    handoffStatus('The setup could not be bookmarked.');
+  }
+}
+
+function onVerifyBrief() {
+  const status = $('verify-status');
+  status.className = 'hint';
+  const text = $('brief-paste').value;
+  if (!text.trim()) {
+    status.textContent = 'Paste a signed brief first.';
+    return;
+  }
+  const res = verifySigned(text);
+  if (res.ok) {
+    status.classList.add('ok');
+    status.textContent = `Verified ${res.format}: sha256 ${res.expected.slice(0, 16)}… matches this brief.`;
+  } else if (res.format === 'unknown') {
+    status.classList.add('bad');
+    status.textContent = 'Not a recognized signed brief.';
+  } else {
+    status.classList.add('bad');
+    status.textContent = res.expected
+      ? `Mismatch: this ${res.format} brief was changed after it was signed.`
+      : `This ${res.format} brief is malformed.`;
+  }
+}
+
+function onSelfTests() {
+  const list = $('selftest-list');
+  list.textContent = '';
+  const tests = runSelfTests();
+  for (const t of tests) {
+    list.append(el('li', { class: 'entry' },
+      el('span', { class: `st-verdict ${t.pass ? 'pass' : 'fail'}`, text: t.pass ? 'pass' : 'fail' }),
+      el('span', { class: 'item', text: t.name }),
+      el('span', { class: 'st-detail', text: t.detail })));
+  }
+  const passed = tests.filter(t => t.pass).length;
+  $('selftest-summary').textContent = `${passed} of ${tests.length} self-tests passed.`;
+  announce(`Self-tests finished: ${passed} of ${tests.length} passed.`);
+}
+
 /* ---------------- shared-link import ---------------- */
 
 async function importHash() {
   const hash = location.hash;
-  if (!hash || !hash.slice(1).startsWith('handoff=')) return;
+  if (!hash) return;
+  if (hash.slice(1).startsWith('care=')) {
+    importBookmark(hash);
+    return;
+  }
+  if (!hash.slice(1).startsWith('handoff=')) return;
   let card = null;
   try {
     card = await openCard(hash);
@@ -787,6 +1140,46 @@ async function importHash() {
     : 'That shared link could not be opened.');
 }
 
+function applyBookmark(bm) {
+  const index = PRESETS.findIndex(p => p.id === bm.scenario);
+  if (index < 0) return;
+  loadPreset(index);
+  state.dropped = [...bm.dropped];
+  state.meds = bm.meds.map(e => ({ ...e }));
+  state.medCtx = { ...bm.medCtx };
+  state.refills = bm.refills.map(r => ({ ...r }));
+  state.person = bm.person ?? state.person;
+  state.lang = bm.lang;
+  state.plan = null;
+  $('scenario').value = preset().id;
+  syncMedContext();
+  renderWeek();
+  renderMeds();
+  renderHandoff();
+}
+
+function importBookmark(hash) {
+  let bm = null;
+  try {
+    bm = decodeBookmark(hash);
+  } catch {
+    bm = null;
+  }
+  // Consume the fragment like a sealed card does: a reload needs the link again.
+  try {
+    history.replaceState(null, '', location.pathname + location.search);
+  } catch { /* the fragment stays; the page still works */ }
+  if (!bm) {
+    setView('handoff', false);
+    handoffStatus('That setup link could not be opened; it may be invalid or changed.');
+    announce('That setup link could not be opened.');
+    return;
+  }
+  applyBookmark(bm);
+  setView('meds', false);
+  announce('Setup restored from the bookmark link.');
+}
+
 /* ---------------- boot ---------------- */
 
 function loadPreset(index) {
@@ -795,6 +1188,7 @@ function loadPreset(index) {
   state.index = index;
   state.dropped = [...(p.dropped ?? [])];
   state.meds = p.medEntries.map(e => ({ ...e }));
+  state.refills = [];
   state.medCtx = { riskWindow: false, lowPlatelets: false, bleedingRisk: false, anticoagulant: false, temperatureAt: null };
   state.checkins = [];
   state.person = p.primaryId ?? p.caregivers[0]?.id ?? null;
@@ -856,6 +1250,21 @@ function wire() {
     $('med-item').append(el('option', { value: key, text: label }));
   }
   $('med-add-form').addEventListener('submit', onAddMed);
+  $('missed-form').addEventListener('submit', onMissedCheck);
+  for (const [key, label] of Object.entries(ITEMS)) {
+    if ((CLASSES[key] ?? []).some(c => c === 'food' || c === 'herbal')) continue;
+    $('refill-item').append(el('option', { value: key, text: label }));
+  }
+  $('refill-form').addEventListener('submit', onAddRefill);
+  $('refill-list').addEventListener('click', e => {
+    const button = e.target.closest('button[data-rrm]');
+    if (!button) return;
+    const removed = state.refills[Number(button.dataset.rrm)];
+    state.refills.splice(Number(button.dataset.rrm), 1);
+    renderRefills();
+    renderReadiness();
+    announce(removed ? `${ITEMS[removed.item]} refill removed.` : 'Refill removed.');
+  });
   $('med-entries').addEventListener('click', e => {
     const button = e.target.closest('button[data-rm]');
     if (!button) return;
@@ -884,6 +1293,12 @@ function wire() {
   $('export-schedule').addEventListener('click', onScheduleCSV);
   $('export-symptoms').addEventListener('click', onSymptomsCSV);
   $('audit-bundle').addEventListener('click', onAudit);
+  $('brief-json').addEventListener('click', onBriefJSON);
+  $('brief-csv').addEventListener('click', onBriefCSV);
+  $('brief-md').addEventListener('click', onBriefMarkdown);
+  $('bookmark-setup').addEventListener('click', onBookmark);
+  $('brief-verify').addEventListener('click', onVerifyBrief);
+  $('run-selftests').addEventListener('click', onSelfTests);
   $('return-demo').addEventListener('click', () => {
     state.imported = null;
     renderHandoff();

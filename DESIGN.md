@@ -66,10 +66,24 @@ rounded square. No icon fonts, no emoji, no external assets.
 - The medicine day: context checkboxes and the add-entry form left; a drawn
   24-hour SVG axis (attribute-positioned ticks, hollow planned / filled logged
   markers, coral diamonds over flagged entries, dashed temp-check line) plus
-  the entry list right, then flags for the care team.
+  the entry list right, then flags for the care team. Below, a four-sheet
+  safety grid: the interaction report (severity chips in evergreen structure,
+  spacing level set apart), the spacing day (a second 24-hour lane where
+  spacing collisions draw a sage band between the two doses, severity shows as
+  a marker halo, and the week's busiest shift boundaries sit above as dashed
+  handoff checkpoints), the missed-dose check (a plain three-time form whose
+  result card always restates the one-dose cap), and the refill runway (ledger
+  rows with a status tag; only the critical under-seven-day tag earns the
+  coral, matching the gaps rule).
 - The handoff: person and language controls, the live binder as a real sheet
   (double-rule head, three-column task table, notes, warning foot), then the
-  seal-link row with its AES caveat and the export row.
+  seal-link row with its AES caveat and the export row. Below it, a four-cell
+  readiness strip (coverage, open shifts, flags, refills under a week) and the
+  busiest handoff times, then the signed-brief sheet (three export buttons, a
+  bookmark row that writes the `#care=` setup link, and a paste-back verify
+  box whose verdict runs sage for held and coral for changed), and finally the
+  self-test sheet: a run button over a ledger of named checks, each with a
+  pass or fail verdict and a one-line detail.
 
 ## Motion
 

@@ -1,11 +1,12 @@
 const namespace = `carebridge-shell:${self.registration.scope}:`;
 // Bump the version whenever a cached file changes; install re-fetches them all.
-const cacheName = `${namespace}v2`;
+const cacheName = `${namespace}v3`;
 const home = new URL('./index.html', self.registration.scope).href;
 const shell = [
   'index.html', 'styles.css', 'favicon.svg', 'src/app.js', 'src/binder.js', 'src/shortcuts.js',
-  'src/clock.js', 'src/crypto-card.js', 'src/exports.js', 'src/meds.js',
-  'src/presets.js', 'src/scheduler.js', 'src/triage.js',
+  'src/clock.js', 'src/crypto-card.js', 'src/digest.js', 'src/exports.js', 'src/handoff-brief.js',
+  'src/interactions.js', 'src/meds.js', 'src/presets.js', 'src/scheduler.js', 'src/selftest.js',
+  'src/triage.js',
 ].map(path => new URL(path, self.registration.scope).href);
 
 self.addEventListener('install', event => {

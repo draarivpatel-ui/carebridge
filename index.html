@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<a class="skip" href="#workspace">Skip to the workbench</a>
+<a class="skiplink" href="#workspace">Skip to the workbench</a>
 
 <header class="masthead">
   <div class="mast-inner">
@@ -185,6 +185,49 @@
         <div id="med-flags" aria-live="polite"></div>
       </div>
     </div>
+    <div class="safety-grid">
+      <div class="sheet">
+        <h2 class="flags-head">Interaction and spacing report</h2>
+        <div id="ix-report" aria-live="polite"></div>
+        <p class="hint report-note">Worked examples over this demo's own catalog only; a real medicine list belongs in front of a pharmacist, not this page.</p>
+      </div>
+      <div class="sheet">
+        <h2 class="flags-head">The spacing day</h2>
+        <div class="timeline">
+          <svg id="dose-axis" viewBox="0 0 640 110" role="img" aria-label="Twenty-four hour spacing view with conflict bands and handoff checkpoints"></svg>
+        </div>
+        <p class="hint" id="dose-key"></p>
+      </div>
+      <div class="sheet">
+        <h2 class="flags-head">A missed dose</h2>
+        <form id="missed-form" class="add-form">
+          <label for="missed-at">Scheduled</label>
+          <input id="missed-at" type="time" required>
+          <label for="missed-next">Next due</label>
+          <input id="missed-next" type="time" required>
+          <label for="missed-now">Remembered</label>
+          <input id="missed-now" type="time" required>
+          <button type="submit" id="missed-run">Check the catch-up</button>
+        </form>
+        <div id="missed-result" class="missed" role="status" aria-live="polite"></div>
+        <p class="hint report-note">The teaching rule is halfway to the next scheduled dose, and it never suggests doubling. The care team's written instructions always come first.</p>
+      </div>
+      <div class="sheet">
+        <h2 class="flags-head">Refill runway</h2>
+        <form id="refill-form" class="add-form">
+          <label for="refill-item">Item</label>
+          <select id="refill-item"></select>
+          <label for="refill-perday">Doses a day</label>
+          <input id="refill-perday" type="number" min="1" max="24" step="1" value="1" required>
+          <label for="refill-onhand">On hand</label>
+          <input id="refill-onhand" type="number" min="0" max="99999" step="1" required>
+          <button type="submit" id="refill-add">Add refill</button>
+        </form>
+        <p id="refill-cap-note" class="hint" hidden>The demo list holds at most 12 refills.</p>
+        <ol id="refill-list" class="entries"></ol>
+        <p class="hint report-note">Under seven days left is critical; under fourteen is a watch.</p>
+      </div>
+    </div>
   </section>
 
   <section id="handoff" class="panel" hidden aria-labelledby="handoff-title">
@@ -221,6 +264,35 @@
       <button type="button" id="export-schedule">Week schedule (CSV)</button>
       <button type="button" id="export-symptoms">Symptom log (CSV)</button>
       <button type="button" id="audit-bundle">Audit bundle (JSON)</button>
+    </div>
+    <h2 class="flags-head ready-head">Readiness at a glance</h2>
+    <dl id="readiness" class="metrics readiness"></dl>
+    <p id="handoff-times" class="hint"></p>
+    <div class="sheet briefbox">
+      <h2 class="flags-head">The signed handoff brief</h2>
+      <div class="exports">
+        <button type="button" id="brief-json">Brief (JSON, signed)</button>
+        <button type="button" id="brief-csv">Brief (CSV, signed)</button>
+        <button type="button" id="brief-md">Brief (Markdown, signed)</button>
+        <button type="button" id="bookmark-setup">Bookmark this setup</button>
+      </div>
+      <label class="sr-only" for="bookmark-link">Setup bookmark link</label>
+      <input id="bookmark-link" type="text" readonly placeholder="The setup bookmark appears here">
+      <div class="verify">
+        <label for="brief-paste">Replay a signed brief</label>
+        <textarea id="brief-paste" rows="5" spellcheck="false" placeholder="Paste a signed JSON, CSV or Markdown brief; the page recomputes its checksum."></textarea>
+        <div class="verify-row">
+          <button type="button" id="brief-verify">Verify the signature</button>
+          <p id="verify-status" class="hint" role="status"></p>
+        </div>
+      </div>
+      <p class="hint report-note">A checksum proves the brief was not changed since it was made; it does not prove who wrote it.</p>
+    </div>
+    <div class="sheet selftest-box">
+      <h2 class="flags-head">In-page self-tests</h2>
+      <button type="button" id="run-selftests">Run self-tests</button>
+      <ol id="selftest-list" class="entries"></ol>
+      <p id="selftest-summary" class="hint" role="status"></p>
     </div>
   </section>
 </main>

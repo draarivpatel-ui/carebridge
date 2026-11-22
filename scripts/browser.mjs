@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+import rawAssert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -9,6 +9,12 @@ import { serve } from './serve.mjs';
 
 const chromePath = process.env.CHROME_BIN ?? (process.platform === 'darwin' ?
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : 'google-chrome');
+let checkCount = 0;
+const assert = new Proxy(rawAssert, {
+  get: (target, prop) => typeof target[prop] === 'function'
+    ? (...args) => { checkCount += 1; return target[prop](...args); }
+    : target[prop],
+});
 const capture = process.argv.includes('--capture');
 const captures = new Map();
 const { server, origin } = await serve(0, '/carebridge/');
@@ -110,8 +116,12 @@ try {
   }
   async function screenshot(name) {
     if (!capture) return;
-    await js('window.scrollTo(0, 0)');
+    await js('window.scrollTo(0, 1); window.scrollTo(0, 0)');
     await pause(350);
+    // A throwaway capture forces the compositor to produce a fresh frame; an
+    // idle headless page otherwise risks stale tiles mid-scroll.
+    await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    await pause(150);
     const result = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
     captures.set(name, Buffer.from(result.data, 'base64'));
   }
@@ -121,7 +131,7 @@ try {
 
   for (const domain of ['Page', 'Runtime', 'Log', 'Network']) await call(`${domain}.enable`);
   await call('Browser.setDownloadBehavior', { behavior: 'deny' });
-  await size(1280, 800, false);
+  await size(1440, 900, false);
   const header = await fetch(origin);
   assert.match(header.headers.get('content-security-policy'), /connect-src 'none'.*frame-ancestors 'none'/);
   assert.equal(header.headers.get('referrer-policy'), 'no-referrer');
@@ -184,6 +194,38 @@ try {
   await click('#med-entries button[data-rm="3"]');
   assert.doesNotMatch(await text('#med-entries'), /ferrous sulfate/i);
 
+  // The safety workbench: pairwise report, spacing day, missed dose, refills.
+  assert.match(await text('#ix-report'), /ciprofloxacin|spacing|mineral/i);
+  assert.ok((await js(`${q('#dose-axis')}.querySelectorAll('circle').length`)) >= 3);
+  assert.ok((await js(`${q('#dose-axis')}.querySelectorAll('rect.band').length`)) >= 1);
+  assert.ok((await js(`${q('#dose-axis')}.querySelectorAll('line.cp').length`)) >= 1);
+  await choose('#med-item', 'warfarin');
+  await setInput('#med-at', '18:00');
+  await click('#med-add');
+  await choose('#med-item', 'ibuprofen');
+  await setInput('#med-at', '14:00');
+  await click('#med-add');
+  assert.match(await text('#ix-report'), /blood thinner plus nsaid/i);
+  assert.match(await text('#ix-report'), /high/i);
+  assert.ok((await js(`${q('#dose-axis')}.querySelectorAll('circle.halo').length`)) >= 1);
+  await setInput('#missed-at', '08:00');
+  await setInput('#missed-next', '20:00');
+  await setInput('#missed-now', '12:00');
+  await click('#missed-run');
+  assert.match(await text('#missed-result'), /take the missed dose/i);
+  assert.match(await text('#missed-result'), /never take two doses/i);
+  await setInput('#missed-now', '16:00');
+  await click('#missed-run');
+  assert.match(await text('#missed-result'), /skip the missed dose/i);
+  assert.match(await text('#missed-result'), /never take two doses/i);
+  await choose('#refill-item', 'warfarin');
+  await setInput('#refill-perday', '2');
+  await setInput('#refill-onhand', '12');
+  await click('#refill-add');
+  assert.match(await text('#refill-list'), /warfarin/i);
+  assert.match(await text('#refill-list'), /critical/i);
+  await screenshot('meds');
+
   await click('#nav-handoff');
   assert.ok(await visible('#handoff'));
   await js(`(() => {
@@ -200,6 +242,23 @@ try {
   assert.match(downloads[1].content, /clinic|caregiver/i);
   assert.match(downloads[2].content, /oncology|temperature/i);
   assert.match(JSON.parse(downloads[3].content).sha256, /^[a-f0-9]{64}$/);
+  assert.equal(await js(`${q('#readiness')}.querySelectorAll('.metric').length`), 4);
+  assert.match(await text('#handoff-times'), /\d{2}:\d{2}/);
+  for (const id of ['#brief-json', '#brief-csv', '#brief-md']) await click(id);
+  const briefs = await until(async () => {
+    const items = await js(`Promise.all(window.__exports.map(async e => ({type:e.type, content:await e.content})))`);
+    return items.length === 7 ? items.slice(4) : false;
+  }, 'three signed brief downloads');
+  assert.match(JSON.parse(briefs[0].content).sha256, /^[a-f0-9]{64}$/);
+  assert.equal(JSON.parse(briefs[0].content).algorithm, 'SHA-256');
+  assert.match(briefs[1].content, /"carebridge-sha256","[a-f0-9]{64}"/);
+  assert.match(briefs[2].content, /\n\nsha256: [a-f0-9]{64}\n$/);
+  await js(`${q('#brief-paste')}.value = ${JSON.stringify(briefs[0].content)}`);
+  await click('#brief-verify');
+  assert.match(await text('#verify-status'), /verified json/i);
+  await js(`${q('#brief-paste')}.value = ${q('#brief-paste')}.value.replace('"warning"', '"caution"')`);
+  await click('#brief-verify');
+  assert.match(await text('#verify-status'), /mismatch|changed/i);
   assert.equal(await choose('#handoff-language', 'en'), 'en');
   assert.equal(await js(`${q('#binder')}.lang`), 'en');
   await call('Emulation.setEmulatedMedia', { media: 'print' });
@@ -233,6 +292,24 @@ try {
   assert.match(await text('#handoff-status'), /invalid|changed/i);
   assert.equal(await js('document.querySelectorAll("[onload],[onerror]").length'), 0);
 
+  await click('#bookmark-setup');
+  const bookmark = await until(() => js(`${q('#bookmark-link')}.value`), 'setup bookmark URL');
+  assert.ok(bookmark.includes('#care='));
+  await navigate(bookmark);
+  await until(async () => /warfarin/i.test(await text('#med-entries')), 'bookmark restored the medicine day');
+  assert.ok(await visible('#meds'));
+  assert.equal(await js('location.hash === ""'), true);
+  assert.match(await text('#refill-list'), /warfarin/i);
+  assert.match(await text('#ix-report'), /blood thinner plus nsaid/i);
+
+  await click('#nav-handoff');
+  await click('#run-selftests');
+  await until(async () => /\d+ of \d+ self-tests passed/.test(await text('#selftest-summary')), 'self-test battery ran');
+  const [, passN, totalN] = /(\d+) of (\d+)/.exec(await text('#selftest-summary')) ?? [];
+  assert.ok(totalN >= 10 && passN === totalN);
+  assert.equal(await js(`${q('#selftest-list')}.querySelectorAll('.st-verdict.fail').length`), 0);
+  assert.ok((await js(`${q('#selftest-list')}.querySelectorAll('.st-verdict.pass').length`)) >= 10);
+
   await size(390, 844, true);
   await call('Page.reload', { ignoreCache: false });
   await until(() => visible('#scenario'), 'mobile load');
@@ -264,7 +341,7 @@ try {
   const dialogs = events.filter(e => e.method === 'Page.javascriptDialogOpening');
   assert.deepEqual({ pageErrors, consoleErrors, external, dialogs }, { pageErrors: [], consoleErrors: [], external: [], dialogs: [] });
   for (const [name, image] of captures) await writeFile(new URL(`../docs/${name}.png`, import.meta.url), image);
-  console.log('Chrome: desktop 1280x800, mobile 390x844, no overflow; native pointer paths; EN and ES 1-page print; handoff import and tamper rejection; cold offline reload; 0 console/page errors; 0 external requests.');
+  console.log(`Chrome: ${checkCount} checks; desktop 1440x900, mobile 390x844, no overflow; native pointer paths; EN and ES 1-page print; handoff import and tamper rejection; interaction report, spacing day, missed-dose and refill workbench; signed JSON/CSV/Markdown briefs verified and tamper-caught; #care= bookmark round-trip; ${totalN} in-page self-tests green; cold offline reload; 0 console/page errors; 0 external requests.`);
 } finally {
   connection?.close();
   if (chrome.pid && chrome.exitCode === null) {

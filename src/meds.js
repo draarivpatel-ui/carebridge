@@ -2,20 +2,32 @@ export const ITEMS = Object.freeze({
   acetaminophen: 'Acetaminophen',
   ibuprofen: 'Ibuprofen',
   naproxen: 'Naproxen',
+  aspirin: 'Aspirin',
   apixaban: 'Apixaban',
   warfarin: 'Warfarin',
+  clopidogrel: 'Clopidogrel',
+  lisinopril: 'Lisinopril',
+  losartan: 'Losartan',
+  spironolactone: 'Spironolactone',
+  furosemide: 'Furosemide',
+  potassium: 'Potassium chloride',
+  metoprolol: 'Metoprolol',
+  levothyroxine: 'Levothyroxine tablets',
+  ciprofloxacin: 'Ciprofloxacin tablets',
   imatinib: 'Imatinib',
   grapefruit: 'Grapefruit',
   wort: "St. John's wort",
-  ciprofloxacin: 'Ciprofloxacin tablets',
-  levothyroxine: 'Levothyroxine tablets',
+  lorazepam: 'Lorazepam',
+  zolpidem: 'Zolpidem',
+  diphenhydramine: 'Diphenhydramine',
+  oxycodone: 'Oxycodone',
   calcium: 'Calcium carbonate',
   iron: 'Ferrous sulfate',
   magnesium: 'Magnesium antacid',
 });
-const NSAIDS = ['ibuprofen', 'naproxen'];
+const NSAIDS = ['ibuprofen', 'naproxen', 'aspirin'];
 const ANTIPYRETICS = ['acetaminophen', ...NSAIDS];
-const BLOOD_THINNERS = ['apixaban', 'warfarin'];
+const BLOOD_THINNERS = ['apixaban', 'warfarin', 'clopidogrel'];
 const MINERALS = ['calcium', 'iron', 'magnesium'];
 const inDay = n => Number.isInteger(n) && n >= 0 && n < 1440;
 
