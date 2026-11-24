@@ -108,7 +108,8 @@ export function validateBookmark(input) {
   const meds = input.meds ?? [];
   const refills = input.refills ?? [];
   const ctx = input.medCtx ?? {};
-  if (!Array.isArray(dropped) || dropped.length > 6 ||
+  if ((input.medCtx != null && (typeof input.medCtx !== 'object' || Array.isArray(input.medCtx))) ||
+      !Array.isArray(dropped) || dropped.length > 6 ||
       [...dropped].some(id => typeof id !== 'string' || !ids.has(id)) ||
       !Array.isArray(meds) || meds.length > MAX_MEDS ||
       [...meds].some(e => !e || typeof e.item !== 'string' || !Object.hasOwn(CLASSES, e.item) ||

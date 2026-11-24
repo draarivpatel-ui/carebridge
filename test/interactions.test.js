@@ -169,6 +169,15 @@ for (const [missed, next, now, want] of [
   });
 }
 
+test('a remembered time after the next dose does not point backward in time', () => {
+  const res = missedDose({ missedAt: 480, nextAt: 1200, now: 1300 });
+  assert.equal(res.action, 'skip');
+  assert.equal(res.toNext, 0);
+  assert.match(res.detail, /already passed/i);
+  assert.match(res.detail, /resume the written schedule/i);
+  assert.doesNotMatch(res.detail, /wait for the next scheduled time/i);
+});
+
 for (let gap = 60; gap <= 1440; gap += 60) {
   test(`never-double-dose invariant across a ${gap}-minute interval`, () => {
     for (let now = 0; now <= gap + 30; now += 15) {

@@ -1,6 +1,6 @@
 const namespace = `carebridge-shell:${self.registration.scope}:`;
 // Bump the version whenever a cached file changes; install re-fetches them all.
-const cacheName = `${namespace}v3`;
+const cacheName = `${namespace}v4`;
 const home = new URL('./index.html', self.registration.scope).href;
 const shell = [
   'index.html', 'styles.css', 'favicon.svg', 'src/app.js', 'src/binder.js', 'src/shortcuts.js',

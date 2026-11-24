@@ -230,7 +230,9 @@ export function missedDose({ missedAt, nextAt, now } = {}) {
     label: take ? 'Take the missed dose now' : 'Skip the missed dose',
     detail: take
       ? 'Less than half the interval has passed, so the missed dose can be taken; the next dose stays on schedule. Never take two doses to catch up.'
-      : 'Half or more of the interval has passed, so the missed dose is skipped; wait for the next scheduled time. Never take two doses to catch up.',
+      : now >= nextAt
+        ? 'The next scheduled dose time has already passed. Do not take the missed dose; resume the written schedule. Never take two doses to catch up.'
+        : 'Half or more of the interval has passed, so the missed dose is skipped; wait for the next scheduled time. Never take two doses to catch up.',
   };
 }
 
