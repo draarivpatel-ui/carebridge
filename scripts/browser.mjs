@@ -178,6 +178,9 @@ try {
   await click('#sign-confusion');
   await setInput('#sustained', '-1');
   await click(submit);
+  assert.match(await text('#triage-result'), /valid temperature|sustained time/i);
+  await setInput('#sustained', '0');
+  await click(submit);
   assert.match(await text('#triage-result'), /emergency services now/i);
   assert.match(await text('#triage-result'), /confusion/i);
   assert.doesNotMatch(await text('#triage-result'), /\[object HTML/);

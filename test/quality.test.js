@@ -48,3 +48,24 @@ test('published text and source pass explicit dash, vendor-mention and CSS hygie
     assert.doesNotMatch(source, /\b(?:\x41I|\x43hatGPT|\x4fpenAI|\x43laude|\x47emini)\b/, name);
   }
 });
+
+test('interactive controls keep AA-visible borders and 44px touch targets', async () => {
+  const css = await file('styles.css');
+  const channel = value => {
+    const srgb = value / 255;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = hex => {
+    const n = Number.parseInt(hex.slice(1), 16);
+    return 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255);
+  };
+  const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  assert.match(css, /--line-strong:\s*#7f7963/);
+  assert.ok(ratio(luminance('#7f7963'), luminance('#fbf7ec')) >= 3);
+  assert.match(css, /button\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /input\[type="number"\], input\[type="time"\], input\[type="text"\], select\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.keys\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.check\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.drop\s*\{[^}]*min-height:\s*44px/);
+  assert.doesNotMatch(css, /\.drop\s*\{[^}]*min-height:\s*25px/);
+});
