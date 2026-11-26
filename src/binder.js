@@ -4,7 +4,7 @@ const TEXT = Object.freeze({
   en: Object.freeze({
     sheet: 'CareBridge handoff',
     preparedFor: 'Prepared for',
-    zone: 'All times shown for',
+    zone: 'Times shown in',
     day: 'Day',
     time: 'Time',
     task: 'Task',
@@ -15,7 +15,7 @@ const TEXT = Object.freeze({
   es: Object.freeze({
     sheet: 'Hoja de entrega de CareBridge',
     preparedFor: 'Preparada para',
-    zone: 'Todos los horarios para',
+    zone: 'Horarios en',
     day: 'Día',
     time: 'Hora',
     task: 'Tarea',
@@ -65,7 +65,7 @@ export function renderBinder(root, card, language = 'en') {
   sheet.append(el('header', { class: 'binder-head' },
     el('h2', { class: 'binder-title', text: t.sheet }),
     el('p', { class: 'binder-for', text: `${t.preparedFor} ${card.alias ?? 'n/a'}` }),
-    el('p', { class: 'binder-zone', text: `${t.zone}: ${card.zone ?? 'n/a'}` })));
+    el('p', { class: 'binder-zone', text: `${t.zone} ${card.zone ?? 'n/a'}` })));
 
   const tasks = [...card.tasks].sort((a, b) => String(a.start).localeCompare(String(b.start)));
   if (!tasks.length) {

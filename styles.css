@@ -86,7 +86,8 @@ input[type="checkbox"] { accent-color: var(--ink); width: 1.05em; height: 1.05em
 
 kbd {
   font-family: var(--sans);
-  font-size: 0.72em;
+  font-size: 0.7rem;
+  line-height: 1.5;
   border: 1px solid var(--line-strong);
   box-shadow: 0 1px 0 var(--line-strong);
   border-radius: 4px;
@@ -172,7 +173,7 @@ kbd {
   background: var(--sage-line);
   margin-inline-end: 0.45em;
 }
-.keys { display: flex; align-items: center; gap: 0.4em; cursor: pointer; }
+.keys { display: flex; align-items: center; gap: 0.4em; min-height: 24px; cursor: pointer; }
 .keys input { margin: 0; }
 
 .workbench {
@@ -317,9 +318,9 @@ main { max-width: 1180px; margin-inline: auto; padding: 0 1.5rem; }
 .day-name {
   display: block;
   font-family: var(--sans);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
@@ -382,6 +383,14 @@ main { max-width: 1180px; margin-inline: auto; padding: 0 1.5rem; }
   to { opacity: 1; transform: none; }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* ---------- Care circle ---------- */
 
 .circle {
@@ -433,7 +442,15 @@ main { max-width: 1180px; margin-inline: auto; padding: 0 1.5rem; }
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
-.drop { display: flex; align-items: center; gap: 0.45em; font-size: 0.82rem; color: var(--ink-soft); cursor: pointer; }
+.drop {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  min-height: 24px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
 .circle-person.out .person-top .name { text-decoration: line-through; text-decoration-thickness: 1px; }
 
 /* ---------- Shared sheet layout ---------- */
@@ -460,7 +477,15 @@ legend {
 .quiet { color: var(--ink-faint); }
 
 .checks { display: grid; gap: 0.45rem; }
-.check { display: flex; align-items: baseline; gap: 0.55em; font-size: 0.92rem; cursor: pointer; flex-wrap: wrap; }
+.check {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55em;
+  min-height: 24px;
+  font-size: 0.92rem;
+  cursor: pointer;
+  flex-wrap: wrap;
+}
 .check.inline { display: inline-flex; }
 
 .field-row {

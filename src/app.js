@@ -401,6 +401,14 @@ function onCheckIn(event) {
   event.preventDefault();
   const tempField = $('temperature');
   const sustainedField = $('sustained');
+  if (!tempField.checkValidity() || !sustainedField.checkValidity()) {
+    const box = $('triage-result');
+    box.textContent = '';
+    box.className = 'triage';
+    box.append(el('p', { text: 'Enter a valid temperature, or leave it blank. Sustained time must be a whole number from 0 to 1440.' }));
+    announce('That check-in has an invalid reading or sustained time.');
+    return;
+  }
   const reading = tempField.value === '' && !tempField.validity.badInput ? null : {
     value: tempField.valueAsNumber,
     unit: $('unit').value,
